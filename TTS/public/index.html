@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Text To Speech 🎙</title>
+  <style>
+    :root {
+      --bg-light: #f5f7fa;
+      --card-light: #ffffff;
+      --text-light: #222;
+
+      --bg-dark: #181a1f;
+      --card-dark: #1f2229;
+      --text-dark: #f5f5f5;
+
+      --primary: #007bff;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--bg-light);
+      color: var(--text-light);
+      transition: 0.3s;
+    }
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .card {
+      flex: 1;
+      background: var(--card-light);
+      padding: 25px;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+      transition: 0.3s;
+    }
+    body.dark .card {
+      background: var(--card-dark);
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      font-size: 22px;
+      color: inherit;
+    }
+
+    textarea {
+      width: 100%;
+      height: 200px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      padding: 15px;
+      resize: none;
+      font-size: 16px;
+      background: inherit;
+      color: inherit;
+    }
+
+    label {
+      margin-top: 15px;
+      display: block;
+      font-weight: bold;
+    }
+
+    select, input[type=file], input[type=range], button {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+      background: inherit;
+      color: inherit;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 15px;
+    }
+
+    .flex-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px 20px;
+      position: relative;
+    }
+
+
+    .dark-toggle {
+      position: absolute;
+      right: 20px;
+      top: 15px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 32px;
+      text-align: center;
+      transition: 0.3s;
+    }
+    .dark-toggle:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h1>🎙 Text To Speech</h1>
+    <button class="dark-toggle" onclick="toggleDark()">🌙</button>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <h2>Nhập văn bản</h2>
+      <textarea id="text" placeholder="Nhập văn bản hoặc chọn file văn bản..."></textarea>
+      <label>Chọn file văn bản:</label>
+      <input type="file" id="fileInput" accept=".txt">
+    </div>
+
+    <div class="card">
+      <h2>Cấu hình giọng đọc</h2>
+
+      <label>Chọn mô hình:</label>
+      <select id="model">
+        <option value="openai">OpenAI TTS</option>
+        <option value="webspeech">Web Speech API</option>
+      </select>
+
+      <div class="flex-row">
+        <div style="flex:1">
+          <label>Chọn giọng đọc:</label>
+          <select id="voice">
+            <option value="alloy">Nam</option>
+            <option value="verse">Nữ</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Ngôn ngữ:</label>
+          <select id="language">
+            <option value="vi">Tiếng Việt</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="webspeech-settings" style="display:none; margin-top:10px;">
+        <label>Ngôn ngữ Web Speech API:</label>
+        <select id="wsLang"></select>
+        <label>Giọng đọc Web Speech API:</label>
+        <select id="wsVoice"></select>
+      </div>
+
+      <label>Tốc độ giọng đọc:</label>
+      <input type="range" id="speed" min="0.5" max="2" step="0.1" value="1">
+      <span id="speedValue">1.0x</span>
+
+      <div class="btn-row">
+        <button onclick="playTTS()"> Đọc ngay</button>
+        <button onclick="downloadTTS()">⬇ Tải MP3</button>
+      </div>
+
+      <audio id="audioPlayer" controls></audio>
+    </div>
+  </div>
+
+  <script>
+    const audioPlayer = document.getElementById("audioPlayer");
+    const speedInput = document.getElementById("speed");
+    const speedValue = document.getElementById("speedValue");
+    const modelSelect = document.getElementById("model");
+    const wsVoiceSelect = document.getElementById("wsVoice");
+    const wsLangSelect = document.getElementById("wsLang");
+
+    function toggleDark() {
+      document.body.classList.toggle("dark");
+    }
+
+    speedInput.addEventListener("input", () => {
+      speedValue.textContent = speedInput.value + "x";
+      audioPlayer.playbackRate = parseFloat(speedInput.value);
+    });
+
+    modelSelect.addEventListener("change", () => {
+      document.getElementById("webspeech-settings").style.display =
+        modelSelect.value === "webspeech" ? "block" : "none";
+    });
+
+    function loadVoices() {
+      const voices = speechSynthesis.getVoices();
+
+      const langs = [...new Set(voices.map(v => v.lang))];
+      wsLangSelect.innerHTML = "";
+      langs.forEach(l => {
+        const opt = document.createElement("option");
+        opt.value = l;
+        opt.textContent = l;
+        wsLangSelect.appendChild(opt);
+      });
+
+      updateVoicesForLang();
+    }
+
+    function updateVoicesForLang() {
+      const selectedLang = wsLangSelect.value;
+      const voices = speechSynthesis.getVoices().filter(v => v.lang === selectedLang);
+
+      wsVoiceSelect.innerHTML = "";
+      voices.forEach(v => {
+        const option = document.createElement("option");
+        option.value = v.name;
+        option.textContent = `${v.name} (${v.lang})`;
+        wsVoiceSelect.appendChild(option);
+      });
+    }
+
+    wsLangSelect.addEventListener("change", updateVoicesForLang);
+
+    speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    async function playTTS() {
+      const text = document.getElementById("text").value;
+      const model = modelSelect.value;
+      const speed = parseFloat(speedInput.value);
+
+      if (model === "openai") {
+        const voice = document.getElementById("voice").value;
+        const response = await fetch("/api/tts/play", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, voice })
+        });
+
+        if (!response.ok) {
+          alert("Lỗi khi gọi OpenAI TTS");
+          return;
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        audioPlayer.src = url;
+        audioPlayer.playbackRate = speed;
+        audioPlayer.play();
+
+      } else {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = wsLangSelect.value;
+        utterance.voice = speechSynthesis.getVoices().find(v => v.name === wsVoiceSelect.value);
+        utterance.rate = speed;
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    async function downloadTTS() {
+      const text = document.getElementById("text").value;
+      const voice = document.getElementById("voice").value;
+
+      const response = await fetch("/api/tts/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, voice })
+      });
+
+      const data = await response.json();
+      window.location.href = data.url;
+    }
+  </script>
+</body>
+</html>
